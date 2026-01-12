@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: mintzy
+      POSTGRES_USER: mintzy
+      POSTGRES_PASSWORD: mintzy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mintzy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://mintzy:mintzy@postgres:5432/mintzy
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build: ./backend
+    command: python -m app.workers.signal_worker
+    environment:
+        REDIS_URL: redis://redis:6379/0
+        DATABASE_URL: postgresql://mintzy:mintzy@postgres:5432/mintzy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_started
